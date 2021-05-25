@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import requests
+from requests.exceptions import HTTPError
 import time
 import os
 from urllib.parse import urljoin
@@ -151,6 +152,7 @@ def migrate_maps_on_wms_workspace():
 def migrate_metadata_records(workspace=None):
     logger.info(f'    Starting - migrate publication metadata records')
     infos = util.get_publication_infos(publ_type=LAYER_TYPE, workspace=workspace)
+    cnt_errors = 0
     for (workspace, _, layer) in infos.keys():
         wms.clear_cache(workspace)
         logger.info(f'      Migrate layer {workspace}.{layer}')
@@ -166,6 +168,13 @@ def migrate_metadata_records(workspace=None):
             if md_wms_url != exp_wms_url:
                 logger.exception(
                     f'        WMS URL was not migrated (should be {exp_wms_url}, but is {md_wms_url})!')
+        except LaymanError as exc:
+            if exc.code == 38 and exc.data and exc.data.get('caused_by') == HTTPError.__name__ and exc.data.get('http_code') >= 500:
+                logger.exception(
+                    f'        Micka raised HTTPError >= 500!')
+                cnt_errors += 1
+            else:
+                raise exc
         time.sleep(0.5)
 
     infos = util.get_publication_infos(publ_type=MAP_TYPE, workspace=workspace)
@@ -183,7 +192,16 @@ def migrate_metadata_records(workspace=None):
             if md_map_endpoint != exp_map_endpoint:
                 logger.exception(
                     f'        Map endpoint was not migrated (should be {exp_map_endpoint}, but is {md_map_endpoint})!')
+        except LaymanError as exc:
+            if exc.code == 38 and exc.data and exc.data.get('caused_by') == HTTPError.__name__ and exc.data.get('http_code') >= 500:
+                logger.exception(
+                    f'        Micka raised HTTPError >= 500!')
+                cnt_errors += 1
+            else:
+                raise exc
         time.sleep(0.5)
+    if cnt_errors > 0:
+        raise LaymanError(38, data={'num_errors': cnt_errors})
     logger.info(f'    DONE - migrate publication metadata records')
 
 

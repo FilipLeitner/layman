@@ -35,7 +35,10 @@ def get_layer_info(username, layername):
             return {}
         muuid = get_metadata_uuid(uuid)
         csw.getrecordbyid(id=[muuid], esn='brief')
-    except (HTTPError, ConnectionError):
+    except HTTPError as exc:
+        current_app.logger.info(f'traceback={traceback.format_exc()},\nresponse={exc.response.text}')
+        return {}
+    except ConnectionError:
         current_app.logger.info(traceback.format_exc())
         return {}
     if muuid in csw.records:
@@ -84,9 +87,12 @@ def patch_layer(username, layername, metadata_properties_to_refresh, actor_name=
             'muuid': muuid,
             'record': record,
         }, timeout=timeout)
-    except (HTTPError, ConnectionError):
+    except HTTPError as exc:
+        current_app.logger.info(f'traceback={traceback.format_exc()},\nresponse={exc.response.text}')
+        raise LaymanError(38, data={'caused_by': exc.__class__.__name__, 'http_code': exc.response.status_code}) from exc
+    except ConnectionError as exc:
         current_app.logger.info(traceback.format_exc())
-        raise LaymanError(38)
+        raise LaymanError(38) from exc
     return muuid
 
 
@@ -105,9 +111,12 @@ def delete_layer(username, layername):
         return
     try:
         common_util.csw_delete(muuid)
-    except (HTTPError, ConnectionError):
+    except HTTPError as exc:
+        current_app.logger.info(f'traceback={traceback.format_exc()},\nresponse={exc.response.text}')
+        raise LaymanError(38, data={'caused_by': exc.__class__.__name__, 'http_code': exc.response.status_code}) from exc
+    except ConnectionError as exc:
         current_app.logger.info(traceback.format_exc())
-        raise LaymanError(38)
+        raise LaymanError(38) from exc
 
 
 def csw_insert(username, layername):
@@ -117,9 +126,12 @@ def csw_insert(username, layername):
         muuid = common_util.csw_insert({
             'record': record
         })
-    except (HTTPError, ConnectionError):
+    except HTTPError as exc:
+        current_app.logger.info(f'traceback={traceback.format_exc()},\nresponse={exc.response.text}')
+        raise LaymanError(38, data={'caused_by': exc.__class__.__name__, 'http_code': exc.response.status_code}) from exc
+    except ConnectionError as exc:
         current_app.logger.info(traceback.format_exc())
-        raise LaymanError(38)
+        raise LaymanError(38) from exc
     return muuid
 
 
